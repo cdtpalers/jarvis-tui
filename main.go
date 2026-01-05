@@ -22,6 +22,12 @@ var (
 	cDark   = lipgloss.Color("#1A1A1A")
 	cDim    = lipgloss.Color("#444444")
 
+	// Nord Palette
+	nordGreen = lipgloss.Color("#A3BE8C")
+	nordTeal  = lipgloss.Color("#8FBCBB")
+	nordBlue  = lipgloss.Color("#81A1C1")
+	nordDark  = lipgloss.Color("#2E3440")
+
 	// Layout Styles
 	docStyle = lipgloss.NewStyle().Padding(1, 2).Background(cDark)
 
@@ -66,6 +72,10 @@ type model struct {
 	netVal    float64
 	booted    bool
 	resonance []float64
+
+	// Matrix Data
+	matrixCols  []int // Y position of the 'head'
+	matrixSpeed []int // Speed factor
 }
 
 func initialModel() model {
@@ -83,16 +93,18 @@ func initialModel() model {
 	vp := viewport.New(40, 15) // Size updated on window resize
 
 	return model{
-		spinner:   s,
-		cpuBar:    p1,
-		pwrBar:    p2,
-		netBar:    p3,
-		viewport:  vp,
-		logs:      []string{"Initializing J.A.R.V.I.S. Protocol..."},
-		cpuVal:    0.2,
-		pwrVal:    0.8,
-		netVal:    0.5,
-		resonance: make([]float64, 20), // Initial buffer
+		spinner:     s,
+		cpuBar:      p1,
+		pwrBar:      p2,
+		netBar:      p3,
+		viewport:    vp,
+		logs:        []string{"Initializing J.A.R.V.I.S. Protocol..."},
+		cpuVal:      0.2,
+		pwrVal:      0.8,
+		netVal:      0.5,
+		resonance:   make([]float64, 20), // Initial buffer
+		matrixCols:  make([]int, 20),     // Initial placeholder size
+		matrixSpeed: make([]int, 20),
 	}
 }
 
@@ -129,6 +141,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.Width = colWidth
 		m.viewport.Height = m.height - 10
 
+		// Resize Matrix
+		matrixWidth := colWidth - 2
+		if len(m.matrixCols) != matrixWidth {
+			newCols := make([]int, matrixWidth)
+			newSpeed := make([]int, matrixWidth)
+			for i := range newCols {
+				newCols[i] = rand.Intn(m.height) * -1 // Start above view
+				newSpeed[i] = rand.Intn(2) + 1
+			}
+			m.matrixCols = newCols
+			m.matrixSpeed = newSpeed
+		}
+
 	case tickMsg:
 		// Simulate live data changes
 		m.cpuVal += (rand.Float64() - 0.5) * 0.1
@@ -160,6 +185,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.resonance) > 0 {
 			m.resonance = m.resonance[1:]
 			m.resonance = append(m.resonance, rand.Float64())
+		}
+
+		// Update Matrix
+		for i := range m.matrixCols {
+			m.matrixCols[i] += m.matrixSpeed[i]
+			if m.matrixCols[i] > m.height {
+				m.matrixCols[i] = rand.Intn(10) * -1 // Reset to top with random delay
+				m.matrixSpeed[i] = rand.Intn(2) + 1
+			}
 		}
 
 		cmds = append(cmds, tickCommand())
@@ -249,8 +283,8 @@ func (m model) View() string {
 		lipgloss.NewStyle().Bold(true).Foreground(cCyan).Render("ARC REACTOR"),
 		lipgloss.NewStyle().Foreground(cDim).Render("Output: 4.8 GJ/s"),
 		"\n",
-		lipgloss.NewStyle().Foreground(cBlue).Render("FIELD HARMONICS"),
-		lipgloss.NewStyle().Foreground(cCyan).Render(resonanceView),
+		lipgloss.NewStyle().Foreground(nordTeal).Bold(true).Render("NEURAL LINK"),
+		matrixView(m.matrixCols, m.matrixSpeed, panelWidth, panelHeight/2),
 	)
 	centerPanel := boxStyle.Width(panelWidth).Height(panelHeight).
 		Align(lipgloss.Center, lipgloss.Center).
@@ -299,6 +333,32 @@ func generateLogCommand() tea.Cmd {
 		}
 		return logMsg(opts[rand.Intn(len(opts))])
 	})
+}
+
+func matrixView(cols, speeds []int, width, height int) string {
+	var sb strings.Builder
+
+	// Create visual grid
+	for y := 0; y < height; y++ {
+		for x := 0; x < width && x < len(cols); x++ {
+			headY := cols[x]
+			char := " "
+
+			if y == headY {
+				// Head char
+				char = "█" // or a random digit
+				sb.WriteString(lipgloss.NewStyle().Foreground(nordTeal).Render(char))
+			} else if y < headY && y > headY-5 {
+				// Trail
+				char = fmt.Sprintf("%d", rand.Intn(10))
+				sb.WriteString(lipgloss.NewStyle().Foreground(nordGreen).Faint(true).Render(char))
+			} else {
+				sb.WriteString(" ")
+			}
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 func main() {
