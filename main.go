@@ -160,7 +160,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Resize Matrix
 		// Ensure we have a grid that covers the center panel
 		m.matrixCols = colWidth - 2
-		m.matrixRows = m.height - 4 // Approximate height inside box style
+		m.matrixRows = m.height - 14 // Leave room for Arc Reactor (Spinner + Text) + Borders
+		if m.matrixRows < 0 {
+			m.matrixRows = 0
+		}
 
 		if len(m.matrixHeads) != m.matrixCols {
 			// Re-initialize if width changed
